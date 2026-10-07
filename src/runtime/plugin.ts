@@ -274,8 +274,13 @@ function shouldSkipEntrance(el): boolean {
 // still be driven by ScrollTrigger or added to a parent timeline without moving the children after it.
 function skipEntrance(timeline) {
   if (!timeline) return
-  const duration = timeline.duration()
+  let duration = timeline.duration()
   timeline.progress(1) // render the end state of every tween
+  // Some plugins only set a tween duration when it first renders: render the end again until it is stable
+  for (let i = 0; i < 10 && timeline.duration() !== duration; i++) {
+    duration = timeline.duration()
+    timeline.progress(1)
+  }
   timeline.clear() // remove the tweens without reverting them
   if (duration) timeline.to({}, { duration })
   timeline.seek(0)
@@ -639,26 +644,27 @@ function prepareTimeline(el, binding, configOptions) {
     timeline.fromTo(animationTarget, binding.value?.[0], binding.value?.[1])
   }
 
-  // .animateText. // .slow // .fast
+  // .animateText. // .slow // .fast // value: string or { text?, speed?, duration?, ease? }
   if (binding.modifiers.animateText) {
+    const options = binding.value && typeof binding.value === 'object' ? binding.value : {}
     // if text is inside element => use it as value and then empty it for animation
     const value
       = typeof binding.value === 'string'
         ? binding.value
-        : binding.value?.text || el.textContent
+        : options.text || el.textContent
     if (el.textContent) el.textContent = ''
 
     const speeds = {
       slow: 0.5,
       fast: 10,
     }
-    const speed
-      = speeds[
-        Object.keys(binding.modifiers).find(modifier =>
-          Object.keys(speeds).includes(modifier),
-        ) || ''
-      ] || 2
-    timeline.to(el, { text: { value, speed } })
+    const speedModifier = Object.keys(speeds).find(modifier => binding.modifiers[modifier])
+    const speed = options.speed ?? (speedModifier ? speeds[speedModifier] : 2)
+    // The duration is set here instead of passing speed to TextPlugin, which only sets it on the first render:
+    // until then the timeline has the wrong duration (truncated text when the entrance is skipped, shifted .add
+    // positions). Same rate as TextPlugin (0.05s / speed per character); constant pace like a typewriter.
+    const duration = options.duration ?? (0.05 / speed) * countTextUnits(value)
+    timeline.to(el, { text: { value }, duration, ease: options.ease ?? 'none' })
   }
 
   // .whileHover.
@@ -717,6 +723,19 @@ function prepareTimeline(el, binding, configOptions) {
   }
 
   return timeline
+}
+
+// Characters as TextPlugin types them: leading line breaks are dropped, whitespace runs count as one space,
+// a nested element counts as one, a <br> is attached to the previous character
+function countTextUnits(html: string): number {
+  const container = document.createElement('div')
+  container.innerHTML = html
+  let count = 0
+  container.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) count += [...(node.nodeValue || '').replace(/^\n+/, '').replace(/\s+/g, ' ')].length
+    else if (node.nodeName.toLowerCase() !== 'br') count++
+  })
+  return count
 }
 
 type CALLBACKS = {
