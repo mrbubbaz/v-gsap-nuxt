@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.14
+
+[compare changes](https://github.com/mrbubbaz/v-gsap-nuxt/compare/v1.5.13...v1.5.14)
+
+### 🩹 Fixes
+
+- **ssr:** Fade in hidden elements when GSAP is late or does not run ([c0f6816](https://github.com/mrbubbaz/v-gsap-nuxt/commit/c0f6816))
+
+### 📖 Documentation
+
+- Document the SSR fallback reveal and .fromInvisible with SplitText ([9387219](https://github.com/mrbubbaz/v-gsap-nuxt/commit/9387219))
+
+### ❤️ Contributors
+
+- Simone Franchina <simone@italianonprofit.it>
+
 ## v1.5.13
 
 [compare changes](https://github.com/mrbubbaz/v-gsap-nuxt/compare/v1.5.12...v1.5.13)
