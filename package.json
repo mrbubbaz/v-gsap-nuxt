@@ -1,8 +1,8 @@
 {
-  "name": "v-gsap-nuxt",
+  "name": "@mrbubbaz/v-gsap-nuxt",
   "version": "1.5.12",
   "description": "GSAP Directive for Nuxt 3 with SplitText support",
-  "repository": "holux-design/v-gsap-nuxt",
+  "repository": "mrbubbaz/v-gsap-nuxt",
   "homepage": "https://v-gsap-nuxt.vercel.app",
   "contributors": [
     {
@@ -42,6 +42,10 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "prepack": "nuxt-module-build build",
     "prepare": "nuxt prepare",
