@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.5.13
+
+[compare changes](https://github.com/mrbubbaz/v-gsap-nuxt/compare/v1.5.12...v1.5.13)
+
+### 🩹 Fixes
+
+- **ssr:** Hide elements with from.opacity:0 to prevent FOUC ([cb3b265](https://github.com/mrbubbaz/v-gsap-nuxt/commit/cb3b265))
+- **ssr:** Keep .from animations visible when hider pins opacity:0 ([5479195](https://github.com/mrbubbaz/v-gsap-nuxt/commit/5479195))
+- Timeline .add children, SplitText fonts and masks, magnetic cleanup ([8e7ac2a](https://github.com/mrbubbaz/v-gsap-nuxt/commit/8e7ac2a))
+- **splitText:** Keep masked descenders visible without changing the line height ([db0907b](https://github.com/mrbubbaz/v-gsap-nuxt/commit/db0907b))
+
+### 📖 Documentation
+
+- Document SplitText waitForFonts and maskPadding behaviour ([e3e883a](https://github.com/mrbubbaz/v-gsap-nuxt/commit/e3e883a))
+
+### 🏡 Chore
+
+- **release:** V1.5.12 ([7cdbc5a](https://github.com/mrbubbaz/v-gsap-nuxt/commit/7cdbc5a))
+- Publish the fork as @mrbubbaz/v-gsap-nuxt on the public npm registry ([705534f](https://github.com/mrbubbaz/v-gsap-nuxt/commit/705534f))
+
+### ❤️ Contributors
+
+- Simone Franchina <simone@italianonprofit.it>
+- William Chong <me@williamchong.cloud>
+- Holux-design <office@holux-design.at>
+
 ## v1.5.12
 
 [compare changes](https://github.com/holux-design/v-gsap-nuxt/compare/v1.5.12...v1.5.12)
