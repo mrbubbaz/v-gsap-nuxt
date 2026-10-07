@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.15
+
+[compare changes](https://github.com/mrbubbaz/v-gsap-nuxt/compare/v1.5.14...v1.5.15)
+
+### 🩹 Fixes
+
+- **animateText:** Set the typing duration up front ([d70b382](https://github.com/mrbubbaz/v-gsap-nuxt/commit/d70b382))
+
+### 📖 Documentation
+
+- AnimateText speed, duration and ease options ([0deb076](https://github.com/mrbubbaz/v-gsap-nuxt/commit/0deb076))
+
+### ❤️ Contributors
+
+- Simone Franchina <simone@italianonprofit.it>
+
 ## v1.5.14
 
 [compare changes](https://github.com/mrbubbaz/v-gsap-nuxt/compare/v1.5.13...v1.5.14)
