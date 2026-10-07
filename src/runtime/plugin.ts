@@ -310,15 +310,7 @@ function prepareSplitText(el, binding) {
     const instance = new SplitText(el, splitOptions)
     el._splitText = instance
 
-    // The masks inherit the element's line-height, so the text keeps its height. With a tight line-height
-    // descenders (g, p, q, y, j) can overflow the mask: splitText.maskPadding extends its clip area downwards,
-    // and the negative margin cancels the padding so the layout does not move.
-    if (maskPadding) {
-      instance.masks?.forEach((mask: HTMLElement) => {
-        mask.style.paddingBottom = maskPadding
-        mask.style.marginBottom = `calc(${maskPadding} * -1)`
-      })
-    }
+    if (instance.masks?.length) fitMasksToGlyphs(instance.masks, maskPadding)
 
     // Fire user callback if provided
     if (typeof onSplitCb === 'function') {
@@ -337,6 +329,53 @@ function prepareSplitText(el, binding) {
 
     return instance
   }
+}
+
+// A mask is as tall as the line-height, so with a tight one (e.g. leading-none on a title) it clips descenders
+// (g, j, p, q, y, Q). Forcing line-height: normal on the mask avoids the clipping but makes the text taller.
+// Instead the split element gets line-height: normal, so its box contains the glyphs and y: '100%' moves them
+// completely out of the mask, and clip-path extends the visible area of the mask to that box.
+// The split element is an inline-block (lines too) with negative margins, so its margin box stays within the
+// line box of the mask: the mask keeps exactly the original line-height whatever the font metrics rounding,
+// and the glyphs do not move since inline-blocks are aligned on their baseline.
+// Values are in em, so they follow responsive font sizes.
+function fitMasksToGlyphs(masks: HTMLElement[], maskPadding?: string) {
+  const items = masks
+    .map((mask) => {
+      const split = mask.firstElementChild as HTMLElement | null
+      if (!split) return null
+      const style = getComputedStyle(split)
+      return { mask, split, lineHeight: Number.parseFloat(style.lineHeight), fontSize: Number.parseFloat(style.fontSize) }
+    })
+    .filter(item => item && item.fontSize > 0) as { mask: HTMLElement, split: HTMLElement, lineHeight: number, fontSize: number }[]
+
+  // Write all, then read all, to measure with a single layout
+  items.forEach(item => (item.split.style.lineHeight = 'normal'))
+  const glyphHeights = items.map(item => item.split.getBoundingClientRect().height)
+
+  items.forEach((item, i) => {
+    // How far the glyphs extend above and below the line-height ("normal" line-height: NaN, nothing to fix)
+    const overflow = (glyphHeights[i] - item.lineHeight) / 2 / item.fontSize
+    if (!(overflow > 0)) {
+      item.split.style.lineHeight = ''
+      if (!maskPadding) return
+    }
+    const extend = overflow > 0 ? `-${+overflow.toFixed(4)}em` : '0px'
+
+    if (overflow > 0) {
+      // 1px more than needed: the margin box only has to fit in the line box, it does not position the glyphs
+      item.split.style.marginTop = `calc(${extend} - 1px)`
+      item.split.style.marginBottom = `calc(${extend} - 1px)`
+      if (getComputedStyle(item.split).display === 'block') {
+        item.split.style.display = 'inline-block'
+        item.split.style.width = '100%'
+      }
+    }
+
+    const bottom = maskPadding ? `calc(${extend} - ${maskPadding})` : extend
+    item.mask.style.overflow = 'visible'
+    item.mask.style.clipPath = `inset(${extend} 0 ${bottom} 0)`
+  })
 }
 
 function prepareTimeline(el, binding, configOptions) {
