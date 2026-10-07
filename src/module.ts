@@ -4,6 +4,7 @@ import {
   createResolver,
   addImports,
   addComponent,
+  addTemplate,
 } from '@nuxt/kit'
 import { defu } from 'defu'
 
@@ -32,6 +33,22 @@ export default defineNuxtModule<ModuleOptions>({
     )
 
     _nuxt.options.css.push(resolver.resolve('./runtime/styles/vgsap.css'))
+
+    // Default delay / duration of the CSS fallback reveal (see vgsap.css), as variables on :root.
+    // Numbers are milliseconds, strings any CSS time.
+    const fallbackReveal = (_nuxt.options.runtimeConfig.public.vgsap as any)?.fallbackReveal
+    const cssTime = (value: unknown) => (typeof value === 'number' ? `${value}ms` : value)
+    const fallbackVariables = [
+      fallbackReveal?.delay != null && `--vgsap-fallback-delay: ${cssTime(fallbackReveal.delay)};`,
+      fallbackReveal?.duration != null && `--vgsap-fallback-duration: ${cssTime(fallbackReveal.duration)};`,
+    ].filter(Boolean)
+    if (fallbackVariables.length) {
+      const template = addTemplate({
+        filename: 'vgsap-fallback.css',
+        getContents: () => `:root { ${fallbackVariables.join(' ')} }\n`,
+      })
+      _nuxt.options.css.push(template.dst)
+    }
 
     // Do not add the extension since the `.ts` will be transpiled to `.mjs` after `npm run prepack`
     addPlugin(resolver.resolve('./runtime/nuxt'))

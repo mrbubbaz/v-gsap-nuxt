@@ -53,7 +53,9 @@ export const vGsapDirective = (
 
     return {
       'data-vgsap-from-invisible': m.fromInvisible || fromOpacityZero || undefined,
-      'data-vgsap-stagger': m.stagger,
+      // With SplitText the stagger targets are created on the client: the server HTML only has text nodes,
+      // which the "> *" hider cannot reach, so hide the element itself
+      'data-vgsap-stagger': (m.stagger && !m.splitText) || undefined,
       'data-vgsap-mask': m.mask,
     }
   },
@@ -78,8 +80,11 @@ export const vGsapDirective = (
 
       await nextTick()
 
+      const skip = shouldSkipEntrance(el)
       const timeline = prepareTimeline(el, binding, configOptions)
+      if (skip) skipEntrance(timeline)
       globalTimelines[gsapId] = timeline
+      releaseSSRHider(el, binding, timeline, skip)
 
       gsapContext.add(() => globalTimelines[gsapId])
     }
@@ -109,9 +114,13 @@ export const vGsapDirective = (
         await waitForFonts(binding)
         if (!el.isConnected) return
 
-        globalTimelines[el._gsapId] = prepareTimeline(el, binding, configOptions)
+        // Checked after the fonts: that wait is what can outlast the CSS fallback delay
+        const skip = shouldSkipEntrance(el)
+        const splitTimeline = prepareTimeline(el, binding, configOptions)
+        if (skip) skipEntrance(splitTimeline)
+        globalTimelines[el._gsapId] = splitTimeline
         gsapContext.add(() => globalTimelines[el._gsapId])
-        releaseSSRHider(el, binding, globalTimelines[el._gsapId])
+        releaseSSRHider(el, binding, splitTimeline, skip)
       }
 
       // Wait for next tick to ensure all child .add directives have been added
@@ -132,6 +141,9 @@ export const vGsapDirective = (
         if (!el.isConnected) return
       }
 
+      // Right before building: if GSAP is later than the CSS fallback, the element may already be visible
+      const skip = shouldSkipEntrance(el)
+
       const breakpoint = configOptions?.breakpoint || 768
       if (binding.modifiers.desktop) {
         mm.add(`(min-width: ${breakpoint}px)`, () => {
@@ -147,7 +159,9 @@ export const vGsapDirective = (
         timeline = prepareTimeline(el, binding, configOptions)
       }
 
-      releaseSSRHider(el, binding, timeline)
+      // Before the .add flow, so a late child still takes its place in the parent timeline
+      if (skip) skipEntrance(timeline)
+      releaseSSRHider(el, binding, timeline, skip)
 
       if (binding.modifiers.add) {
         // Hold the start state until the parent timeline takes over, otherwise the child plays on its own while waiting
@@ -233,13 +247,59 @@ async function waitForFonts(binding) {
   await fonts.ready
 }
 
-// The SSR hider (data-vgsap-from-invisible, see getSSRProps) only has to last until GSAP has applied the start state.
+const SSR_HIDER = 'data-vgsap-from-invisible'
+
+// Elements hidden by the SSR hider in vgsap.css: the children with .stagger, otherwise the element itself
+function hiderTargets(el): HTMLElement[] {
+  return el.getAttribute('data-vgsap-stagger') === 'true' ? Array.from(el.children) : [el]
+}
+
+// The CSS fallback in vgsap.css fades the hidden element in after a delay when GSAP is late (or shows it right away
+// with prefers-reduced-motion): the hider is still there but the element is no longer at opacity 0.
+function fallbackRevealed(el): boolean {
+  if (!el.hasAttribute?.(SSR_HIDER)) return false
+  return hiderTargets(el).some(target => Number.parseFloat(getComputedStyle(target).opacity) > 0)
+}
+
+// Skip the entrance only if the user may have seen the element: it is in the viewport, or reduced motion is on.
+// Out of view it is hidden again (unseen, so no flash) and keeps its scroll animation.
+function shouldSkipEntrance(el): boolean {
+  if (!fallbackRevealed(el)) return false
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
+  const rect = el.getBoundingClientRect()
+  return rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth
+}
+
+// Show the end state instead of a second entrance. The timeline keeps its duration with an empty tween, so it can
+// still be driven by ScrollTrigger or added to a parent timeline without moving the children after it.
+function skipEntrance(timeline) {
+  if (!timeline) return
+  const duration = timeline.duration()
+  timeline.progress(1) // render the end state of every tween
+  timeline.clear() // remove the tweens without reverting them
+  if (duration) timeline.to({}, { duration })
+  timeline.seek(0)
+}
+
+// The SSR hider (see getSSRProps) only has to last until GSAP has applied the start state.
 // .from / .fromTo render it right away on their targets, so the hider can go. With SplitText it has to go: the
 // targets are the split fragments, so the element itself would stay at opacity 0 forever.
-// A plain .to keeps it, because the tween reads its starting opacity from the computed style.
-function releaseSSRHider(el, binding, timeline) {
-  if (timeline && binding.modifiers.to && !binding.modifiers.splitText) return
-  el.removeAttribute('data-vgsap-from-invisible')
+// A plain .to reads its starting opacity from the computed style, so the hidden state is moved to an inline style:
+// keeping the hider would let the CSS fallback override the opacity of the tween.
+// When the fallback has already revealed the element, wait for its fade to end so the opacity does not jump.
+function releaseSSRHider(el, binding, timeline, skipped = false) {
+  if (!el.hasAttribute?.(SSR_HIDER)) return
+
+  if (skipped || (!timeline && fallbackRevealed(el))) {
+    const fades = hiderTargets(el)
+      .flatMap(target => target.getAnimations?.() ?? [])
+      .filter(animation => (animation as CSSAnimation).animationName === 'vgsap-fallback-reveal')
+    Promise.allSettled(fades.map(animation => animation.finished)).then(() => el.removeAttribute(SSR_HIDER))
+    return
+  }
+
+  if (timeline && binding.modifiers.to && !binding.modifiers.splitText) gsap.set(hiderTargets(el), { opacity: 0 })
+  el.removeAttribute(SSR_HIDER)
 }
 
 function assignChildrenOrderAttributesFor(vnode, startOrder?): number {

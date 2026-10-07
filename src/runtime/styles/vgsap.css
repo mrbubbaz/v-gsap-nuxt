@@ -1,6 +1,26 @@
-*[data-vgsap-from-invisible="true"]:not([data-vgsap-stagger="true"]) {
-	opacity: 0;
+/*
+ * SSR hider (data-vgsap-from-invisible, see getSSRProps): hidden until GSAP applies the start state and removes
+ * the attribute. If GSAP is late or never runs, the element fades in on its own after a delay.
+ * Delay and duration: --vgsap-fallback-delay / --vgsap-fallback-duration (per element, or on :root via the
+ * fallbackReveal module option).
+ */
+@keyframes vgsap-fallback-reveal {
+	to {
+		opacity: 1;
+	}
 }
+
+*[data-vgsap-from-invisible="true"]:not([data-vgsap-stagger="true"]),
 *[data-vgsap-from-invisible="true"][data-vgsap-stagger="true"] > * {
 	opacity: 0;
+	animation: vgsap-fallback-reveal var(--vgsap-fallback-duration, 0.6s) ease var(--vgsap-fallback-delay, 1s) forwards;
+}
+
+/* The server cannot know about this setting: show the content right away, without animation */
+@media (prefers-reduced-motion: reduce) {
+	*[data-vgsap-from-invisible="true"]:not([data-vgsap-stagger="true"]),
+	*[data-vgsap-from-invisible="true"][data-vgsap-stagger="true"] > * {
+		opacity: 1;
+		animation: none;
+	}
 }
